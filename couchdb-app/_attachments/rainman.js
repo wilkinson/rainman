@@ -139,7 +139,12 @@
     global.RAINMAN = function (init) {
      // NOTE: This function requires "platform-specific" initialization!
         init = (init instanceof Object) ? init : {};
-        var rm, sync;
+        var add, rm, sync;
+        if (isFunction(init.add)) {
+            add = init.add;
+        } else {
+            throw new Error('RAINMAN needs a definition for "add".');
+        }
         if (isFunction(init.rm)) {
             rm = init.rm;
         } else {
@@ -210,11 +215,14 @@
      // Initialization ...
 
         global.RAINMAN({
+            add: function (x) {
+                puts('add:', x);        //- placeholder: filesystem 'delete'
+            },
             rm: function (x) {
-                puts('rm:', x);         //- placeholder for file 'delete'
+                puts('rm:', x);         //- placeholder: filesystem 'delete'
             },
             sync: function (x) {
-                puts('sync:', x);       //- placeholder for file 'read/write'
+                puts('sync:', x);       //- placeholder: filesystem I/O
             }
         });
 
