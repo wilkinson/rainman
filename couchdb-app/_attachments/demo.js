@@ -6,16 +6,7 @@
 (function main(global) {
     'use strict';
 
-    var a, b, c, d, puts;
-
- // NOTE: I need to test a function as a 'val' property ...
-
-  /*
-    a = new Pair({key: 'lala'});
-    b = new Pair({val: 'lele'});
-    c = new Pair({val: b.val});
-    d = new Pair(b);
-  */
+    var puts;
 
     puts = function () {
         var stringify;
@@ -43,32 +34,26 @@
         puts.apply(this, arguments);
     };
 
-  /*
-    b.val += 1;
-
-    puts(a);
-    puts(b);
-    puts(c);
-    puts(d);
-  */
-
  // Initialization ...
 
-    global.RAINMAN({
-        add: function (x) {
-            puts('add:', x);            //- placeholder: filesystem 'delete'
+    global.RAINMAN.init({
+        read: function (key) {
+            puts('read:', key);
         },
-        rm: function (x) {
-            puts('rm:', x);             //- placeholder: filesystem 'delete'
+        remove: function (key) {
+            puts('remove:', key);
         },
-        sync: function (x) {
-            puts('sync:', x);           //- placeholder: filesystem I/O
+        write: function (key, val) {
+            puts('write:', key, val);
         }
     });
 
  // Invocation
 
-    global.RAINMAN({rm: ['hello', 'world'], sync: ['lala', 'lele']});
+    global.RAINMAN({key: 'hello'});
+    global.RAINMAN({val: 'world'});
+    global.RAINMAN({key: 'lala', val: 'lele'});
+    global.RAINMAN({key: 'lala', val: undefined});
 
 }(function (outer_scope) {
     'use strict';

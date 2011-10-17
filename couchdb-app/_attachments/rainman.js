@@ -1,7 +1,7 @@
 //- JavaScript source code
 
 //- rainman.js ~~
-//                                                      ~~ (c) SRW, 15 Oct 2011
+//                                                      ~~ (c) SRW, 17 Oct 2011
 
 (function (global) {
     'use strict';
@@ -13,79 +13,22 @@
         return;
     }
 
-    if (global.hasOwnProperty('JSON') === false) {
-     // Checking for native JSON _should_ be a thing of the past, but ...
-        throw new Error('JSON object is not available.');
-    }
-
  // Declarations
 
-    var cache, define, isFunction, pack, unpack, uuid;
+    var isFunction, read, remove, uuid, write;
 
  // Definitions
-
-    cache = {};
-
-    define = function (obj, name, params) {
-        if (isFunction(Object.defineProperty)) {
-            define = function (obj, name, params) {
-                return Object.defineProperty(obj, name, params);
-            };
-        } else {
-            define = function (obj, name, params) {
-                /*jslint nomen: true */
-                params = (params instanceof Object) ? params : {};
-                var key;
-                for (key in params) {
-                    if (params.hasOwnProperty(key)) {
-                        switch (key) {
-                        case 'get':
-                            obj.__defineGetter__(name, params[key]);
-                            break;
-                        case 'set':
-                            obj.__defineSetter__(name, params[key]);
-                            break;
-                        case 'value':
-                            delete obj[name];
-                            obj[name] = params[key];
-                            break;
-                        default:
-                         // (placeholder)
-                        }
-                    }
-                }
-                return obj;
-            };
-        }
-        return define(obj, name, params);
-    };
 
     isFunction = function (f) {
         return ((typeof f === 'function') && (f instanceof Function));
     };
 
-    pack = function (x) {
-        return JSON.stringify(x, function replacer(key, val) {
-            if (isFunction(val)) {
-             // NOTE: This is still just a placeholder!
-                if (isFunction(val.toJSON)) {
-                    return val.toJSON();
-                } else if (isFunction(val.toSource)) {
-                    return val.toSource();
-                } else {
-                    return val.toString();
-                }
-            } else {
-                return JSON.stringify(val);
-            }
-        });
+    read = function (key) {
+        throw new Error('RAINMAN needs a definition for "read".');
     };
 
-    unpack = function (x) {
-        return JSON.parse(x, function (key, val) {
-         // NOTE: This is still just a placeholder!
-            return JSON.parse(val);
-        });
+    remove = function (key) {
+        throw new Error('RAINMAN needs a definition for "remove".');
     };
 
     uuid = function () {
@@ -97,73 +40,42 @@
         return x;
     };
 
+    write = function (key, val) {
+        throw new Error('RAINMAN needs a definition for "write".');
+    };
+
  // Constructors
 
-    function Pair(obj) {
+    global.RAINMAN = function (obj) {
+     // NOTE: This function requires initialization before use!
         obj = (obj instanceof Object) ? obj : {};
-        var that = this;
-        define(that, 'key', {
-            configurable: false,
-            enumerable: true,
-            value: (obj.hasOwnProperty('key')) ? unpack(pack(obj.key)) : uuid()
-        });
-        if (cache.hasOwnProperty(that.key) === false) {
-            if (obj.hasOwnProperty('val')) {
-                cache[that.key] = pack(obj.val);
+        switch ((obj.hasOwnProperty('key') ? 2 : 0) +
+                (obj.hasOwnProperty('val') ? 1 : 0)) {
+        case 1:
+         // Only 'val' was specified.
+            return write(uuid(), obj.val);
+        case 2:
+         // Only 'key' was specified.
+            return read(obj.key);
+        case 3:
+         // Both 'key' and 'val' were specified.
+            if (obj.val === undefined) {
+                return remove(obj.key);
             } else {
-             // Ideally, some "onload" events here would help me check the
-             // cloud for data we may be resurrecting from known keys ...
-                cache[that.key] = pack(null);
+                return write(obj.key, obj.val);
             }
-             // sync(that.key);         //- ???
+        default:
+         // Neither a key nor a value was specified.
+            throw new Error('RAINMAN expects at least a "key" or a "val"!');
         }
-        define(that, 'val', {
-            configurable: false,
-            enumerable: true,
-            get: function () {
-                return unpack(cache[that.key]);
-            },
-            set: function (x) {
-                var y = pack(x);
-                if (cache[that.key] !== y) {
-                    cache[that.key] = y;
-                    //sync(that.key);   //- ???
-                }
-            }
-        });
-        return that;
-    }
+    };
 
- // Global definitions
-
-    global.RAINMAN = function (init) {
-     // NOTE: This function requires "platform-specific" initialization!
-        init = (init instanceof Object) ? init : {};
-        var add, rm, sync;
-        if (isFunction(init.add)) {
-            add = init.add;
-        } else {
-            throw new Error('RAINMAN needs a definition for "add".');
-        }
-        if (isFunction(init.rm)) {
-            rm = init.rm;
-        } else {
-            throw new Error('RAINMAN needs a definition for "rm".');
-        }
-        if (isFunction(init.sync)) {
-            sync = init.sync;
-        } else {
-            throw new Error('RAINMAN needs a definition for "sync".');
-        }
-        global.RAINMAN = function (obj) {
-            obj = (obj instanceof Object) ? obj : {};
-            if (obj.hasOwnProperty('rm')) {
-                rm(obj.rm);
-            }
-            if (obj.hasOwnProperty('sync')) {
-                sync(obj.sync);
-            }
-        };
+    global.RAINMAN.init = function (obj) {
+        obj = (obj instanceof Object) ? obj : {};
+        read = (isFunction(obj.read)) ? obj.read : read;
+        remove = (isFunction(obj.remove)) ? obj.remove : remove;
+        write = (isFunction(obj.write)) ? obj.write : write;
+        delete global.RAINMAN.init;
     };
 
  // That's all, folks!
