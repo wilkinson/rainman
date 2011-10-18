@@ -81,66 +81,76 @@
     function AVar(obj) {
         obj = (obj instanceof Object) ? obj : {};
         var estack, rstack, ready, revive, that;
-        estack = [];
-        rstack = [];
-        ready  = true;
-        revive = function (stack) {
-            var f;
-            if (ready === true) {
-                ready = false;
-                f = stack.shift();
-                if (f === undefined) {
-                    ready = true;
-                } else {
-                    f.call(that, that.val, {
-                        failure: function (x) {
-                            that.val = x;
+        if (obj instanceof AVar) {
+            return obj;
+        } else {
+            estack = [];
+            rstack = [];
+            ready  = true;
+            revive = function (stack) {
+                var f;
+                if (ready === true) {
+                    ready = false;
+                    f = stack.shift();
+                    if (f === undefined) {
+                        ready = true;
+                    } else {
+                        try {
+                            f.call(that, that.val, {
+                                failure: function (x) {
+                                    that.val = x;
+                                    //ready = true;
+                                    revive(estack);
+                                },
+                                success: function (x) {
+                                    that.val = x;
+                                    ready = true;
+                                    revive(rstack);
+                                }
+                            });
+                        } catch (err) {
+                            that.val = err;
                             ready = true;
                             revive(estack);
-                        },
-                        success: function (x) {
-                            that.val = x;
-                            ready = true;
-                            revive(rstack);
                         }
-                    });
+                    }
                 }
-            }
-        };
-        that = this;
-        define(that, 'onerror', {
-            configurable: false,
-            enumerable: true,
-            get: function () {
-                return (estack.length > 0) ? estack[0] : null;
-            },
-            set: function (f) {
-                if (isFunction(f)) {
-                    estack.push(f);
-                    revive(estack);
-                } else {
-                    throw new Error('"onerror" method expects a function.');
+            };
+            that = this;
+            define(that, 'onerror', {
+                configurable: false,
+                enumerable: true,
+                get: function () {
+                    return (estack.length > 0) ? estack[0] : null;
+                },
+                set: function (f) {
+                    if (isFunction(f)) {
+                        estack.push(f);
+                        //revive(estack);
+                    } else {
+                        throw new Error('"onerror" expects a function.');
+                    }
                 }
-            }
-        });
-        define(that, 'onready', {
-            configurable: false,
-            enumerable: true,
-            get: function () {
-                return (rstack.length > 0) ? rstack[0] : null;
-            },
-            set: function (f) {
-                if (isFunction(f)) {
-                    rstack.push(f);
-                    revive(rstack);
-                } else {
-                    throw new Error('"onready" method expects a function.');
+            });
+            define(that, 'onready', {
+                configurable: false,
+                enumerable: true,
+                get: function () {
+                    return (rstack.length > 0) ? rstack[0] : null;
+                },
+                set: function (f) {
+                    if (isFunction(f)) {
+                        rstack.push(f);
+                        revive(rstack);
+                    } else {
+                        throw new Error('"onready" expects a function.');
+                    }
                 }
-            }
-        });
-        that.key = (obj.hasOwnProperty('key')) ? obj.key : uuid();
-        that.val = (obj.hasOwnProperty('val')) ? obj.val : null;
-        return that;
+            });
+            that.key = (obj.hasOwnProperty('key')) ? obj.key : uuid();
+            that.val = (obj.hasOwnProperty('val')) ? obj.val : null;
+            return that;
+        }
     }
 
  // Global definitions
