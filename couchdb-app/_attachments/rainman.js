@@ -15,9 +15,41 @@
 
  // Declarations
 
-    var isFunction, read, remove, uuid, write;
+    var define, isFunction, read, remove, uuid, write;
 
  // Definitions
+
+    define = function (obj, name, params) {
+        if (typeof Object.defineProperty === 'function') {
+            define = function (obj, name, params) {
+                return Object.defineProperty(obj, name, params);
+            };
+        } else {
+            define = function (obj, name, params) {
+                var key;
+                for (key in params) {
+                    if (params.hasOwnProperty(key) === true) {
+                        switch (key) {
+                        case 'get':
+                            obj.__defineGetter__(name, params[key]);
+                            break;
+                        case 'set':
+                            obj.__defineSetter__(name, params[key]);
+                            break;
+                        case 'value':
+                            delete obj[name];
+                            obj[name] = params[key];
+                            break;
+                        default:
+                         // (placeholder)
+                        }
+                    }
+                }
+                return obj;
+            };
+        }
+        return define(obj, name, params);
+    };
 
     isFunction = function (f) {
         return ((typeof f === 'function') && (f instanceof Function));
@@ -46,28 +78,107 @@
 
  // Constructors
 
-    global.RAINMAN = function (obj) {
-     // NOTE: This function requires initialization before use!
+    function AVar(obj) {
         obj = (obj instanceof Object) ? obj : {};
-        switch ((obj.hasOwnProperty('key') ? 2 : 0) +
-                (obj.hasOwnProperty('val') ? 1 : 0)) {
+        var estack, rstack, ready, revive, that;
+        estack = [];
+        rstack = [];
+        ready  = true;
+        revive = function (stack) {
+            var f;
+            if (ready === true) {
+                ready = false;
+                f = stack.shift();
+                if (f === undefined) {
+                    ready = true;
+                } else {
+                    f.call(that, that.val, {
+                        failure: function (x) {
+                            that.val = x;
+                            ready = true;
+                            revive(estack);
+                        },
+                        success: function (x) {
+                            that.val = x;
+                            ready = true;
+                            revive(rstack);
+                        }
+                    });
+                }
+            }
+        };
+        that = this;
+        define(that, 'onerror', {
+            configurable: false,
+            enumerable: true,
+            get: function () {
+                return (estack.length > 0) ? estack[0] : null;
+            },
+            set: function (f) {
+                if (isFunction(f)) {
+                    estack.push(f);
+                    revive(estack);
+                } else {
+                    throw new Error('"onerror" method expects a function.');
+                }
+            }
+        });
+        define(that, 'onready', {
+            configurable: false,
+            enumerable: true,
+            get: function () {
+                return (rstack.length > 0) ? rstack[0] : null;
+            },
+            set: function (f) {
+                if (isFunction(f)) {
+                    rstack.push(f);
+                    revive(rstack);
+                } else {
+                    throw new Error('"onready" method expects a function.');
+                }
+            }
+        });
+        that.key = (obj.hasOwnProperty('key')) ? obj.key : uuid();
+        that.val = (obj.hasOwnProperty('val')) ? obj.val : null;
+        return that;
+    }
+
+ // Global definitions
+
+    global.RAINMAN = function (x) {
+     // NOTE: This function requires initialization before use!
+        var y = new AVar(x);
+        switch ((x.hasOwnProperty('key') ? 2 : 0) +
+                (x.hasOwnProperty('val') ? 1 : 0)) {
         case 1:
          // Only 'val' was specified.
-            return write(uuid(), obj.val);
+            y.onready = function (val, exit) {
+                write(y.key, val, exit);
+            };
+            break;
         case 2:
          // Only 'key' was specified.
-            return read(obj.key);
+            y.onready = function (val, exit) {
+                read(y.key, exit);
+            };
+            break;
         case 3:
          // Both 'key' and 'val' were specified.
-            if (obj.val === undefined) {
-                return remove(obj.key);
-            } else {
-                return write(obj.key, obj.val);
-            }
+            y.onready = function (val, exit) {
+                if (val === undefined) {
+                    remove(y.key, exit);
+                } else {
+                    write(y.key, val, exit);
+                }
+            };
+            break;
         default:
-         // Neither a key nor a value was specified.
-            throw new Error('RAINMAN expects at least a "key" or a "val"!');
+         // Neither 'key' nor 'val' was specified -- assume a preallocation?
+            y.onready = function (val, exit) {
+                write(y.key, val, exit);
+            };
         }
+        return y;
     };
 
     global.RAINMAN.init = function (obj) {

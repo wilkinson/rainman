@@ -1,27 +1,25 @@
 //- JavaScript source code
 
-//- couchdb-ajax.js ~~
+//- couchdb-jax.js ~~
 //
-//  This is an example "plugin" for Rainman that enables CouchDB to act as a
-//  filesystem using a web browser and synchronous AJAX calls.
+//  This file defines a Rainman extension that enables CouchDB as a filesystem
+//  using a web browser and AJAX calls. Even though it uses blocking calls, it
+//  still works just fine with my "asynchronous variable model" anyway :-)
 //
-//                                                      ~~ (c) SRW, 17 Oct 2011
+//  NOTE: Obviously, this isn't going to work very well if the RAINMAN function
+//  hasn't loaded in the current environment yet ...
+//
+//                                                      ~~ (c) SRW, 18 Oct 2011
 
 (function () {
     'use strict';
-
- // Ideally, you would write this with Web Chassis in order to guarantee that
- // the RAINMAN function exists in the current environment, and that would
- // also allow me to use asynchronous variables, as shown in Quanah. As it is,
- // though, I have instead opted to demonstrate with blocking calls here.
-
     /*global RAINMAN: false */
 
- // Declarations
+ // Private declarations
 
-    var bookmarks;
+    var bookmarks, cache, isFunction;
 
- // Definitions
+ // Private definitions
 
     bookmarks = {
         doc: function (id) {
@@ -30,20 +28,26 @@
         }
     };
 
+    cache = {};                         //- private storage for _id and _rev
+
+    isFunction = function (f) {
+        return ((typeof f === 'function') && (f instanceof Function));
+    };
+
+ // Initialization
+
     RAINMAN.init({
-        read: function (key) {
+        read: function (key, exit) {
             var request = new XMLHttpRequest();
             request.open('GET', bookmarks.doc(key), false);
             request.send(null);
-            if (request.status !== 200) {
-                throw new Error(request.statusText);
+            if (request.status === 200) {
+                exit.success(JSON.parse(request.responseText));
+            } else {
+                exit.failure(request.statusText);
             }
-            return {
-                key: key,
-                val: JSON.parse(request.responseText)
-            };
         },
-        remove: function (key) {
+        remove: function (key, exit) {
             var each, request, temp;
             request = new XMLHttpRequest();
             request.open('GET', bookmarks.doc(key), false);
@@ -54,20 +58,23 @@
                 break;
             case 404:
                 console.log('Remote document is missing anyway ...');
+                exit.success(undefined);
                 return;
             default:
-                throw new Error(request.statusText);
+                exit.failure(request.statusText);
+                return;
             }
             request.open('DELETE', bookmarks.doc(key), false);
             request.setRequestHeader('If-Match', temp._rev);
             request.send(null);
-            if (request.status !== 200) {
-                throw new Error(request.statusText);
-            } else {
+            if (request.status === 200) {
                 console.log('Deleted the doc "' + key + '".');
+                exit.success(undefined);
+            } else {
+                exit.failure(request.statusText);
             }
         },
-        write: function (key, val) {
+        write: function (key, val, exit) {
             var each, request, temp;
             request = new XMLHttpRequest();
             request.open('GET', bookmarks.doc(key), false);
@@ -85,19 +92,17 @@
                 };
                 break;
             default:
-                throw new Error(request.statusText);
+                exit.failure(request.statusText);
+                return;
             }
             request.open('PUT', bookmarks.doc(key), false);
             request.send(JSON.stringify(temp));
-            if (request.status !== 201) {
-                throw new Error(request.statusText);
-            } else {
+            if (request.status === 201) {
                 console.log(request.responseText);
+                exit.success(temp.val);
+            } else {
+                exit.failure(request.statusText);
             }
-            return {
-                key: key,
-                val: temp.val
-            };
         }
     });
 
