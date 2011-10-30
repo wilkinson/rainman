@@ -28,7 +28,7 @@
             define = function (obj, name, params) {
                 var key;
                 for (key in params) {
-                    if (params.hasOwnProperty(key) === true) {
+                    if (params.hasOwnProperty(key)) {
                         switch (key) {
                         case 'get':
                             obj.__defineGetter__(name, params[key]);
